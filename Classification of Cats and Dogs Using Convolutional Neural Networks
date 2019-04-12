@@ -1,0 +1,508 @@
+# Problem 1
+
+import os
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten, Conv2D, MaxPooling2D, AveragePooling2D
+from sklearn.model_selection import train_test_split
+import numpy as np
+from os import listdir
+from skimage import io
+from scipy.misc import imresize
+from tensorflow.keras.optimizers import Adam
+import keras
+from tensorflow.keras.callbacks import TensorBoard
+
+img_size = 64
+batch_size = 64
+epochs = 50
+
+data_path = 'Train_Data'
+
+labels = listdir(data_path)
+
+x_cat = []
+x_dog = []
+
+cat_imgpath = listdir(data_path+'/'+labels[0])
+dog_imgpath=listdir(data_path+'/'+labels[1])
+
+for img in cat_imgpath:
+    cat_img = io.imread(data_path+'/'+labels[0]+'/'+img)
+    x_cat.append(imresize(cat_img, (img_size, img_size, 3)))
+    
+for img in dog_imgpath:
+    dog_img = io.imread(data_path + '/' + labels[1] + '/' + img)
+    x_dog.append(imresize(dog_img, (img_size, img_size, 3)))
+    
+y_cat = np.zeros(len(cat_imgpath))
+y_dog = np.ones(len(dog_imgpath))
+
+x=np.asarray(x_cat+x_dog)
+y=np.append(y_cat,y_dog)
+
+y = keras.utils.to_categorical(y)
+
+train_x, test_x, train_y, test_y = train_test_split(x, y, test_size=0.1, random_state=30)
+
+NAME = "Problem 1 (bad example)"
+
+train_x = train_x/255.0
+
+model = Sequential()
+
+model.add(Conv2D(32, (3, 3), input_shape=(img_size, img_size, 3)))
+model.add(Activation('sigmoid'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+model.add(Flatten())
+# model.add(Dense(64))
+# model.add(Dropout(0.1))
+# model.add(Activation('sigmoid'))
+model.add(Dense(2))
+model.add(Activation('softmax'))
+
+tensorboard = TensorBoard(log_dir="logs/{}".format(NAME))
+
+model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+model.fit(train_x, train_y,
+          batch_size=batch_size,
+          epochs=epochs,
+          shuffle=True,
+          validation_split=0.1,
+          callbacks=[tensorboard])
+
+score = model.evaluate(test_x, test_y)
+pred=model.predict(test_x)
+
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+
+# Problem 2
+
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+
+x = []
+Y = []
+        
+fully_connected_layers = [0, 1, 2]
+feature_map_sizes = [32, 64, 128]
+convolutional_layers = [1, 2, 3]
+
+for fully_connected_layer in fully_connected_layers:
+    for feature_map_size in feature_map_sizes:
+        for convolutional_layer in convolutional_layers:
+            
+            name = "{} convolutional layer(s), {} feature maps, {} fully connected layer(s)".format(convolutional_layer, feature_map_size, fully_connected_layer)
+            print(name)
+            number_hidden_layers = convolutional_layer + fully_connected_layer
+            x.append(number_hidden_layers)
+            print(number_hidden_layers)
+
+            model = Sequential()
+
+            model.add(Conv2D(feature_map_size, (3, 3), input_shape=(img_size, img_size, 3)))
+            model.add(Activation('relu'))
+            model.add(MaxPooling2D(pool_size=(2, 2)))
+
+            for conv_layer in range(convolutional_layer-1):
+                model.add(Conv2D(feature_map_size, (3, 3)))
+                model.add(Activation('relu'))
+                model.add(MaxPooling2D(pool_size=(2, 2)))
+
+            model.add(Flatten())
+
+            for FC_layer in range(fully_connected_layer):
+                model.add(Dense(feature_map_size))
+                model.add(Activation('relu'))
+
+            model.add(Dense(2))
+            model.add(Activation('sigmoid'))
+
+            tensorboard = TensorBoard(log_dir="logs/{}".format(name))
+
+            model.compile(loss='binary_crossentropy', optimizer = 'adam', metrics = ['accuracy'])
+
+            model.fit(train_x, train_y, batch_size = 64, epochs = 50, validation_split = 0.1, shuffle = True, callbacks = [tensorboard])
+            
+            score = model.evaluate(test_x, test_y)
+
+            print("Test Accuracy:", score[1])
+            
+            plt.xlabel("Number of Hidden Layers")
+            plt.ylabel("Test Accuracy")
+            
+            Y.append(score[1])
+            plt.plot(x, Y, 'ro')
+            plt.show()
+
+# Problem 3
+
+X = []
+Y = []
+
+filter_sizes = [(2, 2), (1, 2), (2, 1), (1, 1)]
+
+for filter_size in filter_sizes:
+    
+    name = "{} filter size".format(filter_size)
+    tensorboard = TensorBoard(log_dir="logs/{}".format(name))
+    print(name)
+    
+    X.append(filter_size)
+    
+    model = Sequential()
+
+    model.add(Conv2D(64, (3, 3), input_shape=(img_size, img_size, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=filter_size))
+    
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=filter_size))
+    
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=filter_size))
+
+    model.add(Flatten())
+    model.add(Dense(64))
+    model.add(Activation('relu'))
+    model.add(Dense(2))
+    model.add(Activation('sigmoid'))
+
+    model.compile(loss='binary_crossentropy', optimizer = 'adam', metrics = ['accuracy'])
+
+    model.fit(train_x, train_y,
+              batch_size = batch_size,
+              epochs = epochs,
+              validation_split = 0.1,
+              shuffle = True,
+              callbacks = [tensorboard])
+
+    score = model.evaluate(test_x, test_y)
+    pred = model.predict(test_x)
+
+    print("Test Accuracy:", score[1])
+    
+    plt.xlabel("Filter Size")
+    plt.ylabel("Test Accuracy")
+    
+    Y.append(score[1])
+    plt.plot(X, Y, 'ro')
+    plt.show()
+    
+# Problem 4
+
+X = []
+Y = []
+
+activation_functions =  ['softmax', 'relu', 'tanh', 'sigmoid']
+classification_activation_functions = ['softmax', 'relu', 'tanh', 'sigmoid']
+for activation_function in activation_functions:
+    for classification_activation_function in classification_activation_functions:
+    
+        name = "{} activation function with {} classification activation function".format(activation_function, classification_activation_function)
+        tensorboard = TensorBoard(log_dir="logs/{}".format(name))
+        print(name)
+    
+        X.append(activation_function)
+    
+        model = Sequential()
+
+        model.add(Conv2D(64, (3, 3), input_shape=(img_size, img_size, 3)))
+        model.add(Activation(activation_function))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+    
+        model.add(Conv2D(64, (3, 3)))
+        model.add(Activation(activation_function))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+    
+        model.add(Conv2D(64, (3, 3)))
+        model.add(Activation(activation_function))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+
+        model.add(Flatten())
+        model.add(Dense(64))
+        model.add(Activation(activation_function))
+        model.add(Dense(2))
+        model.add(Activation(classification_activation_function))
+
+        model.compile(loss='binary_crossentropy', optimizer = 'adam', metrics = ['accuracy'])
+
+        model.fit(train_x, train_y,
+                  batch_size = batch_size,
+                  epochs = epochs,
+                  validation_split = 0.1,
+                  shuffle = True,
+                  callbacks = [tensorboard])
+
+        score = model.evaluate(test_x, test_y)
+        pred = model.predict(test_x)
+
+        print("Test Accuracy:", score[1])
+    
+        plt.xlabel("Activation Function")
+        plt.ylabel("Test Accuracy")
+    
+        Y.append(score[1])
+        plt.plot(X, Y, 'ro')
+        plt.show()
+        
+ # Problem 5 ***********Relu with Softmax is best, 0.6 dropout size is best
+import matplotlib.pyplot as plt
+X = []
+Y = []
+
+dropout_sizes = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
+for dropout_size in dropout_sizes:
+    
+    name = "{} dropout size---".format(dropout_size)
+    tensorboard = TensorBoard(log_dir="logs/{}".format(name))
+    print(name)
+    
+    X.append(dropout_size)
+    
+    model = Sequential()
+
+    model.add(Conv2D(64, (3, 3), input_shape=(img_size, img_size, 3)))
+    model.add(Dropout(dropout_size))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Dropout(dropout_size))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Dropout(dropout_size))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+
+    model.add(Flatten())
+    model.add(Dense(64))
+    model.add(Dropout(dropout_size))
+    model.add(Activation('relu'))
+    model.add(Dense(2))
+    model.add(Activation('softmax'))
+
+    model.compile(loss='binary_crossentropy', optimizer = 'adam', metrics = ['accuracy'])
+
+    model.fit(train_x, train_y,
+              batch_size = batch_size,
+              epochs = epochs,
+              validation_split = 0.1,
+              shuffle = True,
+              callbacks = [tensorboard])
+
+    score = model.evaluate(test_x, test_y)
+    pred = model.predict(test_x)
+
+    print("Test Accuracy:", score[1])
+    
+    plt.xlabel("Dropout Size")
+    plt.ylabel("Test Accuracy")
+    
+    Y.append(score[1])
+    plt.plot(X, Y, 'ro')
+    plt.show()
+    
+# Problem 6
+
+X = []
+Y = []
+
+cost_functions = ['mean_squared_error', 'poisson', 'binary_crossentropy']
+
+for cost_function in cost_functions:
+    
+    name = "{} cost function".format(cost_function)
+    tensorboard = TensorBoard(log_dir="logs/{}".format(name))
+    print(name)
+    
+    X.append(cost_function)
+    
+    model = Sequential()
+
+    model.add(Conv2D(64, (3, 3), input_shape=(img_size, img_size, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+
+    model.add(Flatten())
+    model.add(Dense(64))
+    model.add(Dropout(0.6))
+    model.add(Activation('relu'))
+    model.add(Dense(2))
+    model.add(Activation('softmax'))
+
+    model.compile(loss=cost_function, optimizer = 'adam', metrics = ['accuracy'])
+
+    model.fit(train_x, train_y,
+              batch_size = batch_size,
+              epochs = epochs,
+              validation_split = 0.1,
+              shuffle = True,
+              callbacks = [tensorboard])
+
+    score = model.evaluate(test_x, test_y)
+    pred = model.predict(test_x)
+
+    print("Test Accuracy:", score[1])
+    
+    plt.xlabel("Cost Function")
+    plt.ylabel("Test Accuracy")
+    
+    Y.append(score[1])
+    plt.plot(X, Y, 'ro')
+    plt.show()
+    
+# Problem 6 0.0001
+
+X = []
+Y = []
+
+learning_rates = [0.0001]
+
+for learning_rate in learning_rates:
+    
+    name = "{} learning rate".format(learning_rate)
+    tensorboard = TensorBoard(log_dir="logs/{}".format(name))
+    print(name)
+    
+    X.append(learning_rate)
+    
+    model = Sequential()
+
+    model.add(Conv2D(64, (3, 3), input_shape=(img_size, img_size, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+    
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2,2)))
+
+    model.add(Flatten())
+    model.add(Dense(64))
+    model.add(Dropout(0.6))
+    model.add(Activation('relu'))
+    model.add(Dense(2))
+    model.add(Activation('softmax'))
+
+    model.compile(loss='mean_squared_error', optimizer = Adam(lr = learning_rate), metrics = ['accuracy'])
+
+    model.fit(train_x, train_y,
+              batch_size = batch_size,
+              epochs = epochs,
+              validation_split = 0.1,
+              shuffle = True,
+              callbacks = [tensorboard])
+
+    score = model.evaluate(test_x, test_y)
+    pred = model.predict(test_x)
+
+    print("Test Accuracy:", score[1])
+    
+    plt.xlabel("Learning Rate")
+    plt.ylabel("Test Accuracy")
+    
+    Y.append(score[1])
+    plt.plot(X, Y, 'ro')
+    plt.show()
+    
+# Final Model
+
+name = "Final Model"
+
+model = Sequential()
+
+model.add(Conv2D(32, (3, 3), input_shape=(img_size, img_size, 3)))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+model.add(Conv2D(32, (3, 3)))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+model.add(Conv2D(64, (3, 3)))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+model.add(Flatten())
+model.add(Dense(64))
+model.add(Activation('relu'))
+model.add(Dropout(0.5))
+model.add(Dense(2))
+model.add(Activation('sigmoid'))
+
+tensorboard = TensorBoard(log_dir="logs/{}".format(name))
+
+model.compile(loss='binary_crossentropy', optimizer=Adam(lr=0.0001), metrics=['accuracy'])
+
+model.fit(train_x, train_y,
+          batch_size=batch_size,
+          epochs=epochs,
+          shuffle=True,
+          validation_split=0.1,
+          callbacks=[tensorboard])
+
+score = model.evaluate(test_x, test_y)
+pred=model.predict(test_x)
+
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+
+# Problem 7
+
+from keras.layers import Convolution2D, MaxPooling2D, Activation, Flatten, Dense, Dropout
+from keras.models import Sequential
+import numpy as np
+import matplotlib.pyplot as plt
+import cv2  # only used for loading the image, you can use anything that returns the image as a np.ndarray
+
+#%matplotlib inline
+
+dog = cv2.imread('dog.1.jpg')
+plt.imshow(dog)
+dog.shape
+
+model = Sequential()
+model.add(Convolution2D(3,3,3,input_shape=dog.shape))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2,2)))
+
+model.add(Convolution2D(3,3,3))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2,2)))
+
+model.add(Convolution2D(3,3,3))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2,2)))
+
+dog_batch = np.expand_dims(dog,axis=0)
+
+conv_dog = model.predict(dog_batch)
+
+def visualize_dog(model, dog):
+    # Keras expects batches of images, so we have to add a dimension to trick it into being nice
+    dog_batch = np.expand_dims(dog,axis=0)
+    conv_dog = model.predict(dog_batch)
+    conv_dog = np.squeeze(conv_dog, axis=0)
+    print (conv_dog.shape)
+    plt.imshow(conv_dog)
+    
+visualize_dog(model, dog)
